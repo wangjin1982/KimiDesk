@@ -1,36 +1,49 @@
-// One-shot: render an SF Symbol to a 1024x1024 PNG for the app icon.
-// Run: swift Scripts/make_icon.swift <output.png>
+// One-shot: build the app icon from the Jinger logo.
+// Strategy: logo fills the icon full-bleed in width; the area above/below is
+// filled by stretching the logo's own top/bottom pixel rows, so there is no
+// visible seam even if the logo background has a subtle gradient.
+// Run from package root: swift Scripts/make_icon.swift
 import AppKit
 
-guard CommandLine.arguments.count > 1 else {
-    print("usage: swift make_icon.swift <output.png>")
+let canvas: CGFloat = 1024
+let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+let logoURL = root.appendingPathComponent("Assets/jinger-logo.png")
+let outURL = URL(fileURLWithPath: "/tmp/kimidesk_icon_1024.png")
+
+guard let logo = NSImage(contentsOf: logoURL) else {
+    print("logo not found: \(logoURL.path)")
     exit(1)
 }
 
-let size: CGFloat = 1024
-let cfg = NSImage.SymbolConfiguration(pointSize: size * 0.62, weight: .bold)
-    .applying(NSImage.SymbolConfiguration(paletteColors: [
-        NSColor(red: 0.35, green: 0.45, blue: 1.0, alpha: 1), // kimi blue-violet
-        .white,
-    ]))
-guard let symbol = NSImage(systemSymbolName: "terminal.fill", accessibilityDescription: nil)?
-    .withSymbolConfiguration(cfg) else {
-    print("symbol not found")
-    exit(1)
-}
-
-let image = NSImage(size: NSSize(width: size, height: size))
+let image = NSImage(size: NSSize(width: canvas, height: canvas))
 image.lockFocus()
-// rounded-rect dark background
-let bg = NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: size, height: size),
-                      xRadius: size * 0.22, yRadius: size * 0.22)
-NSColor(white: 0.09, alpha: 1).setFill()
-bg.fill()
-// centered symbol
-let symSize = symbol.size
-let rect = NSRect(x: (size - symSize.width) / 2, y: (size - symSize.height) / 2,
-                  width: symSize.width, height: symSize.height)
-symbol.draw(in: rect)
+
+// 裁成 macOS 圆角图标
+let clip = NSBezierPath(
+    roundedRect: NSRect(x: 0, y: 0, width: canvas, height: canvas),
+    xRadius: canvas * 0.225, yRadius: canvas * 0.225
+)
+clip.addClip()
+
+// logo 全宽绘制，垂直居中
+let lw = logo.size.width, lh = logo.size.height
+let logoH = canvas * lh / lw                       // ≈ 500
+let logoY = (canvas - logoH) / 2
+logo.draw(in: NSRect(x: 0, y: logoY, width: canvas, height: logoH))
+
+// 上缘：拉伸 logo 最上面一行像素（图像坐标系 y 向上，顶行 y = lh-1）
+logo.draw(
+    in: NSRect(x: 0, y: logoY + logoH, width: canvas, height: canvas - logoY - logoH),
+    from: NSRect(x: 0, y: lh - 1, width: lw, height: 1),
+    operation: .sourceOver, fraction: 1
+)
+// 下缘：拉伸 logo 最下面一行像素
+logo.draw(
+    in: NSRect(x: 0, y: 0, width: canvas, height: logoY),
+    from: NSRect(x: 0, y: 0, width: lw, height: 1),
+    operation: .sourceOver, fraction: 1
+)
+
 image.unlockFocus()
 
 guard let tiff = image.tiffRepresentation,
@@ -39,5 +52,5 @@ guard let tiff = image.tiffRepresentation,
     print("png encode failed")
     exit(1)
 }
-try png.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
-print("wrote \(CommandLine.arguments[1])")
+try png.write(to: outURL)
+print("wrote \(outURL.path)")

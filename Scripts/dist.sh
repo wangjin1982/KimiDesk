@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.4.1"
+VERSION="0.4.2"
 APP="Dist/KimiDesk.app"
 
 echo "==> 1. universal release build"
@@ -37,7 +37,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
 EOF
 
 echo "==> 3. icon"
-swift Scripts/make_icon.swift /tmp/kimidesk_icon_1024.png
+swift Scripts/make_icon.swift
 ICONSET=/tmp/KimiDesk.iconset
 rm -rf "$ICONSET" && mkdir "$ICONSET"
 sips -z 16 16     /tmp/kimidesk_icon_1024.png --out "$ICONSET/icon_16x16.png"      >/dev/null
