@@ -57,6 +57,38 @@ struct WebView: NSViewRepresentable {
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(imeGuard)
+        // 隐藏「Open」菜单里本机未安装的编辑器/终端项（官方 SPA 硬编码列表，
+        // 菜单是动态渲染的，用 MutationObserver 兜住每次弹出）
+        let hideUninstalled = WKUserScript(
+            source: """
+            (function(){
+              var HIDE = ['Cursor', 'Antigravity', 'iTerm'];
+              var scheduled = false;
+              function hide() {
+                scheduled = false;
+                var items = document.querySelectorAll('[role="menuitem"]');
+                for (var i = 0; i < items.length; i++) {
+                  if (HIDE.indexOf(items[i].textContent.trim()) >= 0) {
+                    items[i].style.display = 'none';
+                  }
+                }
+              }
+              function schedule() {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(hide);
+              }
+              function start() {
+                new MutationObserver(schedule).observe(document.body, {subtree: true, childList: true});
+              }
+              if (document.body) start();
+              else document.addEventListener('DOMContentLoaded', start);
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(hideUninstalled)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         Task { @MainActor in WebViewStore.shared.webView = webView }
