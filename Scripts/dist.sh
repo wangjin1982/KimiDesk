@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 APP="Dist/KimiDesk.app"
 
 echo "==> 1. universal release build"

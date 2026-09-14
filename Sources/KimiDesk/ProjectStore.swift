@@ -8,6 +8,7 @@ struct Project: Identifiable, Hashable {
     var displayName: String
     var favorite: Bool = false
     var group: String?        // nil = 未分组
+    var yolo: Bool = false    // 自动批准所有操作，不再逐条确认
     var lastOpenedAt: Date?
 
     var id: String { path }
@@ -117,6 +118,7 @@ final class ProjectStore {
         var displayName: String?
         var favorite: Bool?
         var group: String??
+        var yolo: Bool?
         var hidden: Bool?
         var lastOpenedAt: Date?
         var addedManually: Bool?
@@ -176,6 +178,7 @@ final class ProjectStore {
                 displayName: meta?.displayName ?? URL(fileURLWithPath: path).lastPathComponent,
                 favorite: meta?.favorite ?? false,
                 group: group,
+                yolo: meta?.yolo ?? false,
                 lastOpenedAt: meta?.lastOpenedAt
             )
         }
@@ -198,6 +201,7 @@ final class ProjectStore {
                 displayName: p.displayName,
                 favorite: p.favorite,
                 group: .some(p.group),
+                yolo: p.yolo,
                 hidden: false,
                 lastOpenedAt: p.lastOpenedAt,
                 addedManually: nil
@@ -243,6 +247,30 @@ final class ProjectStore {
 
     func setGroup(_ project: Project, to group: String?) {
         mutate(project) { $0.group = group }
+    }
+
+    func toggleYolo(_ project: Project) {
+        mutate(project) { $0.yolo.toggle() }
+    }
+
+    /// 把 yolo 标记写进会话的 state.json（kimi-cli 启动 worker 时会读取
+    /// session.state.approval.yolo）。合并写入，不动其他字段。
+    static func patchSessionYolo(workDir: String, sessionID: String, yolo: Bool) {
+        let f = Project.sessionsDir(for: workDir)
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("state.json")
+        var dict: [String: Any] = [:]
+        if let data = try? Data(contentsOf: f),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            dict = existing
+        }
+        var approval = dict["approval"] as? [String: Any] ?? [:]
+        approval["yolo"] = yolo
+        dict["approval"] = approval
+        if dict["version"] == nil { dict["version"] = 1 }
+        if let data = try? JSONSerialization.data(withJSONObject: dict) {
+            try? data.write(to: f, options: .atomic)
+        }
     }
 
     func markOpened(_ project: Project) {

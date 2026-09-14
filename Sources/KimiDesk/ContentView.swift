@@ -196,6 +196,13 @@ struct ContentView: View {
                     Button(project.favorite ? "取消收藏" : "收藏") {
                         store.toggleFavorite(project)
                     }
+                    Button(project.yolo ? "关闭自动批准 (yolo)" : "自动批准所有操作 (yolo)") {
+                        store.toggleYolo(project)
+                        // 立即作用到当前会话
+                        if let sid = currentSessionID, activePath == project.path {
+                            ProjectStore.patchSessionYolo(workDir: project.path, sessionID: sid, yolo: !project.yolo)
+                        }
+                    }
                     Menu("移动到分组") {
                         Button("未分组") { store.setGroup(project, to: nil) }
                         ForEach(store.groups, id: \.self) { g in
@@ -334,6 +341,10 @@ struct ContentView: View {
             await MainActor.run {
                 resolving = false
                 if let sessionID {
+                    // yolo 项目：把标记写进 state.json，worker 启动时生效
+                    if let project = store.projects.first(where: { $0.path == path }), project.yolo {
+                        ProjectStore.patchSessionYolo(workDir: path, sessionID: sessionID, yolo: true)
+                    }
                     resolvedURL = server.sessionURL(id: sessionID)
                     currentSessionID = sessionID
                     checkConversationStarted(for: path)
@@ -381,6 +392,12 @@ private struct ProjectRow: View {
                 HStack(spacing: 4) {
                     Text(project.displayName)
                         .lineLimit(1)
+                    if project.yolo {
+                        Image(systemName: "bolt.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.purple)
+                            .help("yolo：自动批准所有操作")
+                    }
                     if project.isMissing {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption2)

@@ -19,6 +19,7 @@ The official Kimi desktop app chats with Kimi's conversational model, while **Ki
 - **Session resume** — clicking a project resumes its latest session (or creates one); sessions persist in `~/.kimi/sessions/` across restarts
 - **Project file panel** — browse files the agent generates (e.g. `.md` reports), auto-refreshed every 5s, with QuickLook preview / open / reveal in Finder
 - **Quota at a glance** — toolbar gauge (green/orange/red) with a popover showing 7-day and 5-hour usage, reset countdown, and membership level; refreshes every 5 minutes
+- **Per-project yolo mode** — right-click a project →「自动批准所有操作 (yolo)」: sessions in that project auto-approve every tool call (written into the session's `state.json`, picked up by the kimi-cli worker at start)
 - **Always up to date** — the chat UI is the official kimi-cli web frontend embedded as-is; upgrading is just `uv tool upgrade kimi-cli`
 
 ## Install
