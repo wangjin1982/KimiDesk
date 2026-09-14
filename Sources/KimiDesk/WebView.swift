@@ -31,11 +31,30 @@ final class WebViewStore {
     }
 }
 
+/// 让网页里的文件选择（📎 附件按钮）弹出系统文件面板。
+/// WKWebView 不实现这个代理方法时，<input type="file"> 点了没反应。
+final class WebViewUIDelegate: NSObject, WKUIDelegate {
+    func webView(_ webView: WKWebView,
+                 runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping ([URL]?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = parameters.allowsDirectories
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.begin { response in
+            completionHandler(response == .OK ? panel.urls : nil)
+        }
+    }
+}
+
 struct WebView: NSViewRepresentable {
     let url: URL?
 
+    @MainActor
     final class Coordinator {
         var lastLoadedURL: URL?
+        let uiDelegate = WebViewUIDelegate()
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -91,6 +110,7 @@ struct WebView: NSViewRepresentable {
         config.userContentController.addUserScript(hideUninstalled)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
+        webView.uiDelegate = context.coordinator.uiDelegate
         Task { @MainActor in WebViewStore.shared.webView = webView }
         return webView
     }
