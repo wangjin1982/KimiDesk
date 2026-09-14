@@ -63,15 +63,6 @@ struct ContentView: View {
                         }
                         .help("更多操作")
                     }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            showFiles.toggle()
-                        } label: {
-                            Image(systemName: "doc.text.magnifyingglass")
-                        }
-                        .help("查看项目文件")
-                        .disabled(activePath == nil)
-                    }
                 }
                 .safeAreaInset(edge: .bottom) {
                     ServerStatusView(state: server.state, port: server.port)
@@ -295,6 +286,36 @@ struct ContentView: View {
                             .id(path) // force reload when switching projects
                     }
                     .navigationTitle(store.projects.first(where: { $0.path == path })?.displayName ?? path)
+                    .toolbar {
+                        // 放在 detail 侧工具栏，避免侧栏太窄被折进溢出菜单
+                        ToolbarItem(placement: .primaryAction) {
+                            if let project = store.projects.first(where: { $0.path == path }) {
+                                Button {
+                                    store.toggleYolo(project)
+                                    if let sid = currentSessionID {
+                                        ProjectStore.patchSessionYolo(workDir: project.path, sessionID: sid, yolo: !project.yolo)
+                                    }
+                                    // 会话已在运行：同步发 /yolo 让当前会话立即生效
+                                    if conversationStarted {
+                                        Task { await WebViewStore.shared.submitSlashCommand("/yolo") }
+                                    }
+                                } label: {
+                                    Label(project.yolo ? "yolo 开" : "yolo",
+                                          systemImage: project.yolo ? "bolt.fill" : "bolt")
+                                        .foregroundStyle(project.yolo ? .purple : .secondary)
+                                }
+                                .help(project.yolo ? "yolo 已开启：所有操作自动批准（点击关闭）" : "开启 yolo：所有操作自动批准，不再询问")
+                            }
+                        }
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                showFiles.toggle()
+                            } label: {
+                                Image(systemName: "doc.text.magnifyingglass")
+                            }
+                            .help("查看项目文件")
+                        }
+                    }
                     .inspector(isPresented: $showFiles) {
                         FileListView(dirPath: path)
                             .inspectorColumnWidth(min: 220, ideal: 260, max: 400)

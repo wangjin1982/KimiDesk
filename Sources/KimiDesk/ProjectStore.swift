@@ -162,8 +162,9 @@ final class ProjectStore {
             }
         }
 
-        // 2) manually added paths not (yet) known to kimi-cli
-        for (path, meta) in metas where meta.addedManually == true {
+        // 2) 用户手动维护的项目：projects.json 里所有未隐藏的条目。
+        // （之前靠 addedManually 标志，但它会被后续的 persistAll 覆盖丢失）
+        for (path, meta) in metas where meta.hidden != true {
             paths.insert(path)
         }
 

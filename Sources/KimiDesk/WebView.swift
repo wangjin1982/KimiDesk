@@ -1,6 +1,36 @@
 import SwiftUI
 import WebKit
 
+/// Holds a weak reference to the active WKWebView so native UI (toolbar)
+/// can evaluate JS in the page (e.g. submit "/yolo" to the live session).
+@MainActor
+final class WebViewStore {
+    static let shared = WebViewStore()
+    weak var webView: WKWebView?
+
+    /// Type a slash command into the chat textarea and submit it.
+    /// Only attempts when the input is empty (never clobbers a draft).
+    /// Returns the JS result string ("sent" / "no-textarea" / "not-empty").
+    @discardableResult
+    func submitSlashCommand(_ command: String) async -> String {
+        guard let webView else { return "no-webview" }
+        let js = """
+        (function(){
+          var ta = document.querySelector('textarea[data-slot="textarea"]') || document.querySelector('textarea');
+          if (!ta) return 'no-textarea';
+          if (ta.value && ta.value.trim() !== '') return 'not-empty';
+          var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(ta, '\(command)');
+          ta.dispatchEvent(new Event('input', {bubbles: true}));
+          ta.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true, cancelable: true}));
+          return 'sent';
+        })()
+        """
+        let result = try? await webView.evaluateJavaScript(js)
+        return result as? String ?? "error"
+    }
+}
+
 struct WebView: NSViewRepresentable {
     let url: URL?
 
@@ -29,6 +59,7 @@ struct WebView: NSViewRepresentable {
         config.userContentController.addUserScript(imeGuard)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
+        Task { @MainActor in WebViewStore.shared.webView = webView }
         return webView
     }
 
